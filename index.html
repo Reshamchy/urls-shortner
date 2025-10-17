@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple URL Shortener</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f2f2f2;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .container {
+      background-color: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    input[type="text"] {
+      width: 80%;
+      padding: 10px;
+      margin-bottom: 15px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-left: 5px;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    #result {
+      margin-top: 15px;
+      font-weight: bold;
+    }
+    ul {
+      text-align: left;
+      margin-top: 15px;
+      padding-left: 20px;
+    }
+    ul li {
+      margin-bottom: 5px;
+    }
+    ul li button {
+      background-color: #dc3545;
+      margin-left: 10px;
+    }
+    ul li button:hover {
+      background-color: #a71d2a;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>URL Shortener</h1>
+    <input type="text" id="longUrl" placeholder="Enter your URL here">
+    <button id="shortenBtn">Shorten URL</button>
+    <div id="result"></div>
+    <h2>Saved URLs:</h2>
+    <ul id="urlList"></ul>
+  </div>
+
+  <script>
+    const shortenBtn = document.getElementById("shortenBtn");
+    const longUrlInput = document.getElementById("longUrl");
+    const resultDiv = document.getElementById("result");
+    const urlList = document.getElementById("urlList");
+
+    const baseUrl = "http://short.ly/";
+
+    // Load saved URLs from localStorage
+    let urls = JSON.parse(localStorage.getItem("urls")) || [];
+    renderUrlList();
+
+    shortenBtn.addEventListener("click", () => {
+      const longUrl = longUrlInput.value.trim();
+      if (!longUrl) {
+        alert("Please enter a URL!");
+        return;
+      }
+
+      const shortCode = generateShortCode();
+      const shortUrl = baseUrl + shortCode;
+
+      // Save to localStorage
+      urls.push({ longUrl, shortUrl });
+      localStorage.setItem("urls", JSON.stringify(urls));
+
+      resultDiv.innerHTML = `Short URL: <a href="${longUrl}" target="_blank">${shortUrl}</a>`;
+      renderUrlList();
+
+      longUrlInput.value = "";
+    });
+
+    function generateShortCode(length = 6) {
+      const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+      let code = "";
+      for (let i = 0; i < length; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return code;
+    }
+
+    function renderUrlList() {
+      urlList.innerHTML = "";
+      urls.forEach((urlObj, index) => {
+        const li = document.createElement("li");
+        li.innerHTML = `<a href="${urlObj.longUrl}" target="_blank">${urlObj.shortUrl}</a>
+                        <button onclick="deleteUrl(${index})">Delete</button>`;
+        urlList.appendChild(li);
+      });
+    }
+
+    function deleteUrl(index) {
+      urls.splice(index, 1);
+      localStorage.setItem("urls", JSON.stringify(urls));
+      renderUrlList();
+    }
+  </script>
+</body>
+</html>
