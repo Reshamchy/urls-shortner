@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Simple URL Shortener</title>
+  <title>Firebase URL Shortener</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -38,33 +38,21 @@
       cursor: pointer;
       margin-left: 5px;
     }
-    button:hover {
-      background-color: #0056b3;
-    }
-    #result {
-      margin-top: 15px;
-      font-weight: bold;
-    }
-    ul {
-      text-align: left;
-      margin-top: 15px;
-      padding-left: 20px;
-    }
-    ul li {
-      margin-bottom: 5px;
-    }
+    button:hover { background-color: #0056b3; }
+    #result { margin-top: 15px; font-weight: bold; }
+    ul { text-align: left; margin-top: 15px; padding-left: 20px; }
+    ul li { margin-bottom: 5px; }
     ul li button {
       background-color: #dc3545;
       margin-left: 10px;
     }
-    ul li button:hover {
-      background-color: #a71d2a;
-    }
+    ul li button:hover { background-color: #a71d2a; }
   </style>
 </head>
 <body>
+
   <div class="container">
-    <h1>URL Shortener</h1>
+    <h1>Firebase URL Shortener</h1>
     <input type="text" id="longUrl" placeholder="Enter your URL here">
     <button id="shortenBtn">Shorten URL</button>
     <div id="result"></div>
@@ -72,62 +60,80 @@
     <ul id="urlList"></ul>
   </div>
 
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
   <script>
+    // 1️⃣ Initialize Firebase
+   const firebaseConfig = {
+  apiKey: "AIzaSyBIs4SwCfUqzPge0LxqNUwqUzKzFknfv3I",
+  authDomain: "videoappxyz.firebaseapp.com",
+  projectId: "videoappxyz",
+  storageBucket: "videoappxyz.firebasestorage.app",
+  messagingSenderId: "200506250623",
+  appId: "1:200506250623:web:0d48b8c61c6f9c519af64a",
+  measurementId: "G-C1MRPHZ796"
+};
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
     const shortenBtn = document.getElementById("shortenBtn");
     const longUrlInput = document.getElementById("longUrl");
     const resultDiv = document.getElementById("result");
     const urlList = document.getElementById("urlList");
 
-    const baseUrl = "https://rewardtube.netlify.app/";
+    const baseUrl = "https://rewardtube.netlify.app/"; // Replace with your domain
 
-    // Load saved URLs from localStorage
-    let urls = JSON.parse(localStorage.getItem("urls")) || [];
-    renderUrlList();
-
+    // 2️⃣ Shorten URL and save in Firebase
     shortenBtn.addEventListener("click", () => {
       const longUrl = longUrlInput.value.trim();
-      if (!longUrl) {
-        alert("Please enter a URL!");
-        return;
-      }
+      if (!longUrl) { alert("Please enter a URL!"); return; }
 
       const shortCode = generateShortCode();
       const shortUrl = baseUrl + shortCode;
 
-      // Save to localStorage
-      urls.push({ longUrl, shortUrl });
-      localStorage.setItem("urls", JSON.stringify(urls));
+      db.ref("urls/" + shortCode).set({ longUrl, shortUrl })
+        .then(() => {
+          resultDiv.innerHTML = `Short URL: <a href="${longUrl}" target="_blank">${shortUrl}</a>`;
+          longUrlInput.value = "";
+        })
+        .catch(err => console.error(err));
+    });
 
-      resultDiv.innerHTML = `Short URL: <a href="${longUrl}" target="_blank">${shortUrl}</a>`;
-      renderUrlList();
-
-      longUrlInput.value = "";
+    // 3️⃣ Listen to Firebase for URL list updates
+    db.ref("urls").on("value", snapshot => {
+      const urls = snapshot.val();
+      renderUrlList(urls);
     });
 
     function generateShortCode(length = 6) {
       const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
       let code = "";
-      for (let i = 0; i < length; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
+      for (let i = 0; i < length; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
       return code;
     }
 
-    function renderUrlList() {
+    function renderUrlList(urls) {
       urlList.innerHTML = "";
-      urls.forEach((urlObj, index) => {
+      if (!urls) return;
+
+      Object.keys(urls).forEach(key => {
         const li = document.createElement("li");
-        li.innerHTML = `<a href="${urlObj.longUrl}" target="_blank">${urlObj.shortUrl}</a>
-                        <button onclick="deleteUrl(${index})">Delete</button>`;
+        li.innerHTML = `<a href="${urls[key].longUrl}" target="_blank">${urls[key].shortUrl}</a>
+                        <button onclick="deleteUrl('${key}')">Delete</button>`;
         urlList.appendChild(li);
       });
     }
 
-    function deleteUrl(index) {
-      urls.splice(index, 1);
-      localStorage.setItem("urls", JSON.stringify(urls));
-      renderUrlList();
+    function deleteUrl(key) {
+      db.ref("urls/" + key).remove()
+        .catch(err => console.error(err));
     }
+
+    // Make deleteUrl global so it can be called from inline onclick
+    window.deleteUrl = deleteUrl;
   </script>
 </body>
 </html>
