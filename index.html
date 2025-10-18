@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Firebase URL Shortener</title>
+  <title>Bitly URL Shortener</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -42,98 +42,85 @@
     #result { margin-top: 15px; font-weight: bold; }
     ul { text-align: left; margin-top: 15px; padding-left: 20px; }
     ul li { margin-bottom: 5px; }
-    ul li button {
-      background-color: #dc3545;
-      margin-left: 10px;
-    }
+    ul li button { background-color: #dc3545; margin-left: 10px; }
     ul li button:hover { background-color: #a71d2a; }
   </style>
 </head>
 <body>
-
   <div class="container">
-    <h1>Firebase URL Shortener</h1>
-    <input type="text" id="longUrl" placeholder="Enter your URL here">
+    <h1>Bitly URL Shortener</h1>
+    <input type="text" id="longUrl" placeholder="Enter your URL here (include http:// or https://)">
     <button id="shortenBtn">Shorten URL</button>
     <div id="result"></div>
     <h2>Saved URLs:</h2>
     <ul id="urlList"></ul>
   </div>
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
   <script>
-    // 1️⃣ Initialize Firebase
-   const firebaseConfig = {
-  apiKey: "AIzaSyBIs4SwCfUqzPge0LxqNUwqUzKzFknfv3I",
-  authDomain: "videoappxyz.firebaseapp.com",
-  projectId: "videoappxyz",
-  storageBucket: "videoappxyz.firebasestorage.app",
-  messagingSenderId: "200506250623",
-  appId: "1:200506250623:web:0d48b8c61c6f9c519af64a",
-  measurementId: "G-C1MRPHZ796"
-};
-
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
     const shortenBtn = document.getElementById("shortenBtn");
     const longUrlInput = document.getElementById("longUrl");
     const resultDiv = document.getElementById("result");
     const urlList = document.getElementById("urlList");
 
-    const baseUrl = "https://rewardtube.netlify.app/"; // Replace with your domain
+    const BITLY_TOKEN = "c08d780cf2385057a15ecb1741981015bba20149"; // 🔑 Put your token here
 
-    // 2️⃣ Shorten URL and save in Firebase
-    shortenBtn.addEventListener("click", () => {
-      const longUrl = longUrlInput.value.trim();
-      if (!longUrl) { alert("Please enter a URL!"); return; }
+    let urls = JSON.parse(localStorage.getItem("urls")) || [];
+    renderUrlList();
 
-      const shortCode = generateShortCode();
-      const shortUrl = baseUrl + shortCode;
+    shortenBtn.addEventListener("click", async () => {
+      let longUrl = longUrlInput.value.trim();
+      if (!longUrl) return alert("Please enter a URL!");
+      if (!longUrl.startsWith("http")) {
+        longUrl = "https://" + longUrl; // auto-fix missing protocol
+      }
 
-      db.ref("urls/" + shortCode).set({ longUrl, shortUrl })
-        .then(() => {
-          resultDiv.innerHTML = `Short URL: <a href="${longUrl}" target="_blank">${shortUrl}</a>`;
-          longUrlInput.value = "";
-        })
-        .catch(err => console.error(err));
+      try {
+        const shortUrl = await shortenWithBitly(longUrl);
+        urls.push({ longUrl, shortUrl });
+        localStorage.setItem("urls", JSON.stringify(urls));
+        resultDiv.innerHTML = `Short URL: <a href="${shortUrl}" target="_blank">${shortUrl}</a>`;
+        renderUrlList();
+        longUrlInput.value = "";
+      } catch (err) {
+        alert("Error shortening URL: " + err.message);
+        console.error(err);
+      }
     });
 
-    // 3️⃣ Listen to Firebase for URL list updates
-    db.ref("urls").on("value", snapshot => {
-      const urls = snapshot.val();
-      renderUrlList(urls);
-    });
+    async function shortenWithBitly(longUrl) {
+      const response = await fetch("https://api-ssl.bitly.com/v4/shorten", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${BITLY_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ long_url: longUrl })
+      });
 
-    function generateShortCode(length = 6) {
-      const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-      let code = "";
-      for (let i = 0; i < length; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
-      return code;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Bitly API error");
+      }
+
+      const data = await response.json();
+      return data.link; // real Bitly short URL
     }
 
-    function renderUrlList(urls) {
+    function renderUrlList() {
       urlList.innerHTML = "";
-      if (!urls) return;
-
-      Object.keys(urls).forEach(key => {
+      urls.forEach((urlObj, index) => {
         const li = document.createElement("li");
-        li.innerHTML = `<a href="${urls[key].longUrl}" target="_blank">${urls[key].shortUrl}</a>
-                        <button onclick="deleteUrl('${key}')">Delete</button>`;
+        li.innerHTML = `<a href="${urlObj.shortUrl}" target="_blank">${urlObj.shortUrl}</a>
+                        <button onclick="deleteUrl(${index})">Delete</button>`;
         urlList.appendChild(li);
       });
     }
 
-    function deleteUrl(key) {
-      db.ref("urls/" + key).remove()
-        .catch(err => console.error(err));
+    function deleteUrl(index) {
+      urls.splice(index, 1);
+      localStorage.setItem("urls", JSON.stringify(urls));
+      renderUrlList();
     }
-
-    // Make deleteUrl global so it can be called from inline onclick
-    window.deleteUrl = deleteUrl;
   </script>
 </body>
 </html>
